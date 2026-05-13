@@ -1,0 +1,20 @@
+{
+  "mergeBehavior": "merge",
+  "tabAutocompleteOptions": {
+    "useCache": true,
+    "maxPromptTokens": 2048
+  },
+  "tabAutocompleteModel": {
+    "title": "DeepSeek Coder (Project)",
+    "model": "deepseek-coder",
+    "provider": "openai",
+    "apiKey": "${DEEPSEEK_API_KEY}",
+    "apiBase": "https://api.deepseek.com/v1",
+    "useLegacyCompletionsEndpoint": false,
+    "completionOptions": {
+      "maxTokens": 512,
+      "temperature": 0.0
+    }
+  },
+  "useGlobalRules": false
+}

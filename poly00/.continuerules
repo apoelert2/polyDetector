@@ -1,0 +1,6 @@
+# .continuerules
+- Gib immer nur die minimale, ausführbare Lösung (Code). Keine Erklärungen.
+- Verwende ### für Code-Blöcke, wenn nötig. Präferiere Code-Ausgaben.
+- Nutze die aktive Programmiersprache immer.
+- Baue keine unnötigen Abhängigkeiten auf.
+- Kommentiere nur das Nötigste.

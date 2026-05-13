@@ -1,0 +1,55 @@
+# ~/.continue/config.yaml
+
+schema: v1
+name: Token-Efficient Configuration with DeepSeek
+
+# Standard-Komplettierungsoptionen für alle Modelle
+defaultCompletionOptions:
+  maxTokens: 1024          # Begrenzt die Token pro Antwort (gängige LLM-Ausgabe)
+  temperature: 0.2         # Niedrig für konsistente, token-sparende Antworten
+  topP: 0.95
+
+models:
+  - title: DeepSeek Chat
+    provider: openai
+    model: deepseek-chat
+    apiKey: ${DEEPSEEK_API_KEY}
+    apiBase: https://api.deepseek.com/v1
+    contextLength: 128000   # DeepSeek's Kontextlänge effizient nutzen
+    maxStopWords: 16        # Vermeidet Overhead durch zu lange Stop-Wörter-Arrays
+    roles: [chat, edit, apply, summarize]
+
+# Autovervollständigung mit Fokus auf Token-Effizienz
+tabAutocompleteOptions:
+  useCache: true            # Vermeidet wiederholte API-Aufrufe
+  maxPromptTokens: 2048     # Begrenzt die Token für den Prompt
+  template: |
+    ~~~{{language}}
+    {{code}}
+    ~~~
+    [CURSOR]
+
+tabAutocompleteModel:
+  title: DeepSeek Coder
+  model: deepseek-coder
+  provider: openai
+  apiKey: ${DEEPSEEK_API_KEY}
+  apiBase: https://api.deepseek.com/v1
+  useLegacyCompletionsEndpoint: false
+
+# Kontext-Einschränkungen für Token-Einsparung
+contextProvider:
+  maxTokensFromHistory: 8000   # Begrenzt den Verlauf auf ein Minimum
+  disableInContextRetrieval: false
+
+experimental:
+  localHistory: true             # Verhindert erneutes Senden langer Verläufe
+  saveChatHistory: true
+
+# customKommando
+customCommands:
+  - name: polyDetector
+    prompt: "file://.continue/prompts/polyDetector.prompt"
+    description: "Load polyDetector full context"
+experimental:
+  useSystemMessage: true
