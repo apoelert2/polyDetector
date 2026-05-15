@@ -22,7 +22,12 @@ logger = logging.getLogger("poller")
 def load_tag_ids(path: str) -> list[int]:
     with open(path) as f:
         data = json.load(f)
-    return data if isinstance(data, list) else [data]
+    if not isinstance(data, list):
+        data = [data]
+    # Handle objects with 'id' field vs raw integers
+    if data and isinstance(data[0], dict):
+        return [int(item['id']) for item in data]
+    return [int(i) for i in data]
 
 
 def main() -> None:

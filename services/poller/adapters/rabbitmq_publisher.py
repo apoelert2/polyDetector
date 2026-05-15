@@ -35,6 +35,10 @@ class RabbitMqPublisher(MessagePublisherPort):
         self._connection = pika.BlockingConnection(params)
         self._channel = self._connection.channel()
         self._channel.exchange_declare(exchange="polymarket", exchange_type="topic", durable=True)
+        self._channel.queue_declare(queue="markets.raw", durable=True)
+        self._channel.queue_bind(
+            exchange="polymarket", queue="markets.raw", routing_key="markets.raw"
+        )
         logger.info("Connected to RabbitMQ at %s:%s", self._host, self._port)
 
     def publish(self, routing_key: str, message: dict[str, Any]) -> None:
