@@ -1,0 +1,64 @@
+services:
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-secret_cookie_value}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq:Z
+    userns_mode: "keep-id:uid=999,gid=999"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - polydetector
+
+  timescaledb:
+    image: docker.io/timescale/timescaledb:latest-pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${TIMESCALE_USER:-poly}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASS:-poly_secret}
+      POSTGRES_DB: ${TIMESCALE_DB:-poly_detector}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALE_USER:-poly} -d ${TIMESCALE_DB:-poly_detector}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - polydetector
+
+  poller:
+    build:
+      context: ./services/poller
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+      TAG_IDS_PATH: /data/tag_ids.json
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./tag_ids.json:/data/tag_ids.json:ro
+    restart: unless-stopped
+    networks:
+      - polydetector
+
+networks:
+  polydetector:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
