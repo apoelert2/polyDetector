@@ -51,7 +51,7 @@ services:
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - ./tag_ids.json:/data/tag_ids.json:ro
+      - ./tag_ids.json:/data/tag_ids.json:ro,Z
     restart: unless-stopped
     networks:
       - polydetector
