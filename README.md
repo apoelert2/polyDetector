@@ -18,8 +18,8 @@ Every service follows **Clean Architecture** (Entities → Use Cases → Adapter
 
 | Service | Language | Task |
 |---------|----------|------|
-| **Poller** | Python 3.12 | Fetches Polymarket Gamma API, publishes raw data |
-| **Extractor** | Python 3.12 | Processes raw data, enriches, publishes |
+| **Poller** | Python 3.12 | Fetches Polymarket Gamma API, publishes raw data to `markets.raw` |
+| **Extractor** | Python 3.12 | Consumes `markets.raw`, enriches with volume/liquidity/spread, publishes to `markets.enriched` |
 | **WS-Subscriber** | Java 25+ | WebSocket client for real-time data |
 | **Storage** | Java 25+ | Persists data to TimescaleDB |
 | **Pipeline-Monitor** | Python 3.12 | Monitors health and throughput |
@@ -50,8 +50,9 @@ podman compose up -d --build
 # 4. Check logs
 podman compose logs -f
 
-# 5. Run smoke test
-python services/pipeline-monitor/smoke_test.py
+# 5. Run smoke tests
+python services/pipeline-monitor/smoke_test.py  # Poller pipeline
+python services/extractor/smoke_test.py          # Extractor pipeline (raw → enriched)
 ```
 
 ### Individual Services
@@ -96,11 +97,11 @@ polyDetector/
 ├── PLAN.md                   # Project plan & roadmap
 ├── README.md                 # This file
 └── services/
-    ├── poller/               # Phase 1 ✅
-    ├── extractor/            # Phase 2 ⏭️
-    ├── ws-subscriber/        # Phase 3 ⏭️
-    ├── storage/              # Phase 4 ⏭️
-    └── pipeline-monitor/     # Phase 5 ⏭️
+    ├── poller/               # Phase 1
+    ├── extractor/            # Phase 2
+    ├── ws-subscriber/        # Phase 3
+    ├── storage/              # Phase 4
+    └── pipeline-monitor/     # Phase 5
 ```
 
 ---
@@ -108,18 +109,6 @@ polyDetector/
 ## Project Plan
 
 The full plan with phases, milestones, and architecture decisions is in **[PLAN.md](PLAN.md)**.
-
-### Status
-
-| Phase | Status |
-|-------|--------|
-| 1 – Infrastructure + Poller | ✅ Complete |
-| 2 – Extractor | ⏭️ Next up |
-| 3 – WS-Subscriber | ⏳ |
-| 4 – Storage | ⏳ |
-| 5 – Pipeline-Monitor | ⏳ |
-| 6 – Stabilization | ⏳ |
-| 7 – Insider Trading Analysis | ⏳ |
 
 ---
 

@@ -35,6 +35,24 @@ services:
     networks:
       - polydetector
 
+  extractor:
+    build:
+      context: ./services/extractor
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+      INPUT_QUEUE: markets.raw
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    networks:
+      - polydetector
+
   poller:
     build:
       context: ./services/poller
