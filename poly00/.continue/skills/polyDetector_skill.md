@@ -3,6 +3,9 @@ You are an expert developer building the **polyDetector** event-driven pipeline.
 ## Project Goal
 Build a real-time pipeline that discovers Polymarket markets, subscribes to their WebSocket feeds, and persists enriched messages into TimescaleDB, with monitoring for silence/low throughput.
 
+## Vision
+**polyDetector** soll eine vollständig eigenständige, containerisierte Datenpipeline werden, die auf beliebigen Hosting-Plattformen (Hetzner Cloud, AWS EC2, beliebige VPS) deployed werden kann. Weiterhin soll langfristig eine Auswertung der Daten im Hinblick auf Insider-Trading erfolgen.
+
 ## Architecture & Queues
 - `new_markets` – Full market JSON from Polymarket Gamma API. Field `_source: "polymarket"`.
 - `market_ids` – Slim JSON: `{"market_id": "...", "source": "polymarket"}`.
@@ -11,7 +14,7 @@ Build a real-time pipeline that discovers Polymarket markets, subscribes to thei
 ## Service Blueprints
 
 ### 1. poller (Python)
-- Reads tag IDs from `TAG_IDS_PATH` (default: `../../data/tag_ids.json`).
+- Reads tag IDs from `TAG_IDS_PATH` (default: `./polyDetector/tag_ids.json`).
 - Polls `https://gamma-api.polymarket.com/markets?tag_id=...` every `POLL_INTERVAL_SECONDS` (default 60).
 - For each market object, publishes to `new_markets` queue.
 - Deduplication: Keep a set of seen market IDs (in-memory, no persistence needed) to avoid republishing identical markets.
