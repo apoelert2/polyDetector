@@ -1,1 +1,27 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.log
+
+# Java/Gradle
+.gradle/
+build/
+target/
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# continue context files
 services/15-05-26.yaml
+PLAN.md
