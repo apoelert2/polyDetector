@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""polyDetector Poller – Composition Root."""
+#polyDetector Poller – Composition Root.
 
 import json
 import logging
@@ -10,6 +10,7 @@ import time
 from adapters.gamma_api import GammaApi
 from adapters.rabbitmq_publisher import RabbitMqPublisher
 from domain.use_cases.poll_markets import PollMarkets
+from utils import load_tag_ids
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -19,15 +20,15 @@ logging.basicConfig(
 logger = logging.getLogger("poller")
 
 
-def load_tag_ids(path: str) -> list[int]:
-    with open(path) as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        data = [data]
-    # Handle objects with 'id' field vs raw integers
-    if data and isinstance(data[0], dict):
-        return [int(item['id']) for item in data]
-    return [int(i) for i in data]
+# def load_tag_ids(path: str) -> list[int]:
+#     with open(path) as f:
+#         data = json.load(f)
+#     if not isinstance(data, list):
+#         data = [data]
+#     # Handle objects with 'id' field vs raw integers
+#     if data and isinstance(data[0], dict):
+#         return [int(item['id']) for item in data]
+#     return [int(i) for i in data]
 
 
 def main() -> None:
