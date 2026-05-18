@@ -1,4 +1,4 @@
-#Unit tests for ProcessMarkets use case.
+# Unit tests for ProcessMarkets use case.
 
 from unittest.mock import MagicMock
 

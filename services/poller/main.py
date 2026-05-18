@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-#polyDetector Poller – Composition Root.
+# polyDetector Poller – Composition Root.
 
-import json
 import logging
 import os
 import sys

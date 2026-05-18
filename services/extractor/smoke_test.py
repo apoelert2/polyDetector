@@ -60,7 +60,7 @@ def _rabbitmq_request(path: str, method: str = "GET", body: dict | None = None) 
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         print(f"  HTTP error {e.code}: {e.reason}")
-        if e.code == 404:
+        if e.code in (404, 406):
             return {}
         sys.exit(1)
     except urllib.error.URLError as e:
@@ -103,7 +103,7 @@ def publish_test_message() -> str | None:
         "condition_id": test_condition_id,
         "question": "Smoke test: will this pass?",
         "description": "Automated smoke test message",
-        "outcomes": [{"name": "Yes"}, {"name": "No"}],
+        "outcomes": [{"name": "Yes", "price": 0.63}, {"name": "No", "price": 0.37}],
         "volume": "1000.50",
         "end_date": "2026-12-31T23:59:59Z",
         "volume24hr": "100.00",

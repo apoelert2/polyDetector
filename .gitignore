@@ -23,5 +23,5 @@ target/
 Thumbs.db
 
 # continue context files
-services/15-05-26.yaml
 PLAN.md
+readiness_check.md
