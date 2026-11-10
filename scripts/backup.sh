@@ -15,6 +15,7 @@ file="$DIR/polydetector-$(date -u +%Y%m%dT%H%M%SZ).dump"
 # A full disk stops the DB and with it the data collection: only dump if the DB size fits twice over.
 db_bytes="$($COMPOSE exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT pg_database_size(current_database())"' | tr -dc '0-9')"
 free_bytes="$(df --output=avail -B1 "$DIR" | tail -1 | tr -dc '0-9')"
+db_bytes=$((10#$db_bytes))  # base 10: podman compose may prefix "\e[0m", leaving a leading 0 (octal)
 if ((free_bytes < 2 * db_bytes)); then
   echo "backup skipped: $((free_bytes >> 20)) MiB free, need $((2 * db_bytes >> 20)) MiB (2x DB size)" >&2
   exit 1

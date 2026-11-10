@@ -8,14 +8,15 @@ TIMEOUT="${1:-240}"
 COMPOSE="${COMPOSE:-podman compose}"
 
 query() {
-  $COMPOSE exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$0"' "$1"
+  # Digits only: podman compose may prefix "\e[0m". Callers compare with 10# (no octal from a leading 0).
+  $COMPOSE exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$0"' "$1" | tr -dc '0-9'
 }
 
 check() {  # name, sql returning a count
   local deadline=$((SECONDS + TIMEOUT)) n
   while ((SECONDS < deadline)); do
-    n="$(query "$2" 2>/dev/null || echo 0)"
-    if ((n > 0)); then
+    n="$(query "$2" 2>/dev/null || true)"
+    if ((10#${n:-0} > 0)); then
       echo "[PASS] $1 ($n)"
       return 0
     fi

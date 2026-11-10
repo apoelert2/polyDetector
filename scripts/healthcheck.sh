@@ -9,14 +9,15 @@ COMPOSE="${COMPOSE:-podman compose}"
 URL="${HEALTHCHECK_URL:-$(grep -E '^HEALTHCHECK_URL=' .env 2>/dev/null | cut -d= -f2- || true)}"
 
 query() {
-  $COMPOSE exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$0"' "$1"
+  # Digits only: podman compose may prefix "\e[0m". Callers compare with 10# (no octal from a leading 0).
+  $COMPOSE exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$0"' "$1" | tr -dc '0-9'
 }
 
 failures=()
 check() {  # name, sql returning a count
   local n
-  n="$(query "$2" 2>/dev/null || echo 0)"
-  ((n > 0)) || failures+=("$1")
+  n="$(query "$2" 2>/dev/null || true)"
+  ((10#${n:-0} > 0)) || failures+=("$1")
 }
 check "market snapshots (15 min)" "SELECT count(*) FROM market_snapshots WHERE time > now() - interval '15 minutes'"
 check "websocket events (15 min)" "SELECT count(*) FROM ws_events WHERE received_at > now() - interval '15 minutes'"
