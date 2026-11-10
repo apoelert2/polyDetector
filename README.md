@@ -41,8 +41,8 @@ Each service follows Clean Architecture: entities → use cases with ports → a
 ## Quick start
 
 ```bash
-cp .env.example .env              # set TIMESCALE_PASS
-podman compose up -d --build      # docker compose works too
+cp .env.example .env              # set TIMESCALE_PASS and GHCR_OWNER
+podman compose up -d --build      # builds locally via docker-compose.override.yaml; docker compose works too
 scripts/smoke_test.sh             # waits until real data is in every table
 ```
 

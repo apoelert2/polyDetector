@@ -1,5 +1,7 @@
 # Works with `podman compose` and `docker compose`.
 # Credentials come only from .env (see .env.example); compose refuses to start if they are missing.
+# This file runs prebuilt images (server). Locally, docker-compose.override.yaml is merged in
+# automatically and builds from source instead.
 
 x-db-env: &db-env
   TIMESCALE_HOST: timescaledb
@@ -31,7 +33,7 @@ services:
       - polydetector
 
   poller:
-    build: ./services/poller
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/polydetector-poller:${IMAGE_TAG:-latest}
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -48,7 +50,7 @@ services:
       - polydetector
 
   ws-subscriber:
-    build: ./services/ws-subscriber
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/polydetector-ws-subscriber:${IMAGE_TAG:-latest}
     depends_on:
       timescaledb:
         condition: service_healthy
