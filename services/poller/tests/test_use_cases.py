@@ -34,7 +34,11 @@ class FakeRepo(RepositoryPort):
 
 
 class FakeMarketApi(MarketApiPort):
+    def __init__(self) -> None:
+        self.ranges: list[tuple[datetime, datetime]] = []
+
     def fetch_closing_markets(self, tag_id: int, end_min: datetime, end_max: datetime) -> list[Market]:
+        self.ranges.append((end_min, end_max))
         if tag_id == 99:
             raise ConnectionError("boom")
         return [replace(MARKET, tag_ids=(tag_id,))]
@@ -60,15 +64,18 @@ class FakeTradeApi(TradeApiPort):
 
 def test_poll_markets_merges_tags_and_survives_failing_tag() -> None:
     repo = FakeRepo()
-    count = PollMarkets(FakeMarketApi(), repo, timedelta(hours=24)).execute([2, 99, 126], NOW)
+    api = FakeMarketApi()
+    count = PollMarkets(api, repo, timedelta(hours=24), timedelta(hours=6)).execute([2, 99, 126], NOW)
     assert count == 1
     assert repo.markets[0].tag_ids == (2, 126)
+    # Markets that ended up to 6 h ago are still watched: trading often continues until resolution.
+    assert api.ranges[0] == (NOW - timedelta(hours=6), NOW + timedelta(hours=24))
 
 
 def test_poll_trades_respects_backfill_and_last_seen() -> None:
     repo = FakeRepo(ids=["0xa", "0xb"], latest={"0xa": NOW - timedelta(minutes=10)})
     api = FakeTradeApi([trade("0xa", 5), trade("0xa", 30), trade("0xb", 30), trade("0xb", 300)])
-    use_case = PollTrades(api, repo, window=timedelta(hours=24), backfill=timedelta(hours=1))
+    use_case = PollTrades(api, repo, window=timedelta(hours=24), grace=timedelta(hours=6), backfill=timedelta(hours=1))
 
     assert use_case.execute(NOW) == 2  # 0xa: only newer than last seen; 0xb: only within backfill
     assert {(t.condition_id, t.time) for t in repo.trades} == {
@@ -80,7 +87,7 @@ def test_poll_trades_respects_backfill_and_last_seen() -> None:
 def test_poll_trades_second_cycle_does_not_reread_backfill() -> None:
     repo = FakeRepo(ids=["0xa", "0xquiet"])
     api = FakeTradeApi([trade("0xa", m) for m in range(0, 600, 10)])
-    use_case = PollTrades(api, repo, window=timedelta(hours=24), backfill=timedelta(hours=10))
+    use_case = PollTrades(api, repo, window=timedelta(hours=24), grace=timedelta(hours=6), backfill=timedelta(hours=10))
     use_case.execute(NOW)
     api.consumed = 0
     use_case.execute(NOW + timedelta(minutes=1))

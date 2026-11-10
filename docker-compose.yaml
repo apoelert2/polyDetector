@@ -10,10 +10,11 @@ x-db-env: &db-env
   TIMESCALE_USER: ${TIMESCALE_USER:?set TIMESCALE_USER in .env}
   TIMESCALE_PASS: ${TIMESCALE_PASS:?set TIMESCALE_PASS in .env}
   CLOSING_WINDOW_HOURS: ${CLOSING_WINDOW_HOURS:-24}
+  CLOSING_GRACE_HOURS: ${CLOSING_GRACE_HOURS:-6}
 
 services:
   timescaledb:
-    image: docker.io/timescale/timescaledb:latest-pg16
+    image: docker.io/timescale/timescaledb:2.26.1-pg16  # pinned: a deploy must never upgrade the DB by surprise
     ports:
       - "127.0.0.1:5432:5432"  # localhost only; on the VPS use an SSH tunnel
     environment:

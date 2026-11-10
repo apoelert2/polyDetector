@@ -27,15 +27,20 @@ def main() -> None:
     tag_ids = load_tag_ids(os.getenv("TAG_IDS_PATH", "/data/tag_ids.json"))
     poll_interval = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
     window = timedelta(hours=float(os.getenv("CLOSING_WINDOW_HOURS", "24")))
+    grace = timedelta(hours=float(os.getenv("CLOSING_GRACE_HOURS", "6")))
     backfill = timedelta(hours=float(os.getenv("TRADE_BACKFILL_HOURS", "24")))
 
     repo = PostgresRepository(DbSettings.from_env())
-    poll_markets = PollMarkets(GammaApi(os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com")), repo, window)
+    poll_markets = PollMarkets(
+        GammaApi(os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com")), repo, window, grace
+    )
     poll_trades = PollTrades(
-        DataApi(os.getenv("DATA_API_URL", "https://data-api.polymarket.com")), repo, window, backfill
+        DataApi(os.getenv("DATA_API_URL", "https://data-api.polymarket.com")), repo, window, grace, backfill
     )
 
-    logger.info("Poller started. %d tag IDs, window=%s, interval=%ds", len(tag_ids), window, poll_interval)
+    logger.info(
+        "Poller started. %d tag IDs, window=%s, grace=%s, interval=%ds", len(tag_ids), window, grace, poll_interval
+    )
     while True:
         started = time.monotonic()
         now = datetime.now(UTC)

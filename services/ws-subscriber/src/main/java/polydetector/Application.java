@@ -26,7 +26,8 @@ public final class Application {
         var sink = new PostgresEventSink(config.dbUrl(), config.dbUser(), config.dbPassword(), QUEUE_CAPACITY);
         var useCase = new SubscribeToMarket(
                 new PolymarketWebSocketClient(config.wsUrl()),
-                new PostgresAssetSource(config.dbUrl(), config.dbUser(), config.dbPassword(), config.windowHours()),
+                new PostgresAssetSource(config.dbUrl(), config.dbUser(), config.dbPassword(), config.windowHours(),
+                        config.graceHours()),
                 sink,
                 new SpikeDetector(config.spikeWindowMinutes(), config.spikeHistoryMinutes(), config.spikeFactor(),
                         config.spikeMinNotional()));

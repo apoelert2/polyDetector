@@ -9,6 +9,7 @@ public record Config(
         String dbUser,
         String dbPassword,
         double windowHours,
+        double graceHours,
         int spikeWindowMinutes,
         int spikeHistoryMinutes,
         double spikeFactor,
@@ -24,6 +25,7 @@ public record Config(
                 required(env, "TIMESCALE_USER"),
                 required(env, "TIMESCALE_PASS"),
                 Double.parseDouble(env.getOrDefault("CLOSING_WINDOW_HOURS", "24")),
+                Double.parseDouble(env.getOrDefault("CLOSING_GRACE_HOURS", "6")),
                 Integer.parseInt(env.getOrDefault("SPIKE_WINDOW_MINUTES", "5")),
                 Integer.parseInt(env.getOrDefault("SPIKE_HISTORY_MINUTES", "60")),
                 Double.parseDouble(env.getOrDefault("SPIKE_FACTOR", "5")),
@@ -42,7 +44,8 @@ public record Config(
     @Override
     public String toString() {
         return "Config[wsUrl=" + wsUrl + ", dbUrl=" + dbUrl + ", dbUser=" + dbUser + ", dbPassword=***"
-                + ", windowHours=" + windowHours + ", spikeWindowMinutes=" + spikeWindowMinutes
+                + ", windowHours=" + windowHours + ", graceHours=" + graceHours
+                + ", spikeWindowMinutes=" + spikeWindowMinutes
                 + ", spikeHistoryMinutes=" + spikeHistoryMinutes + ", spikeFactor=" + spikeFactor
                 + ", spikeMinNotional=" + spikeMinNotional + ", assetRefreshSeconds=" + assetRefreshSeconds + "]";
     }

@@ -4,7 +4,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -51,17 +54,49 @@ public final class PolymarketWebSocketClient implements WebSocketPort {
     @Override
     public void subscribe(List<String> ids) {
         List<String> next = List.copyOf(ids);
-        if (next.equals(assetIds)) {
+        List<String> previous = assetIds;
+        if (next.equals(previous)) {
             return;
         }
         assetIds = next;
         logger.info("Subscription changed: {} assets", next.size());
         WebSocketClient current = client;
-        if (current == null) {
+        if (next.isEmpty()) {
+            if (current != null) {
+                current.close(); // onClose does not reconnect while the set is empty
+            }
+        } else if (current != null && current.isOpen()) {
+            // Change the subscription on the open connection: no reconnect, no blind gap.
+            updateMessages(previous, next).forEach(current::send);
+        } else if (current == null || current.isClosed()) {
             scheduleReconnect(0);
-        } else {
-            current.close(); // onClose reconnects with the new set, or stays closed if it is empty
         }
+        // else: still connecting; onOpen subscribes to the current set.
+    }
+
+    /** Subscribe/unsubscribe messages that turn {@code previous} into {@code next}. */
+    static List<String> updateMessages(List<String> previous, List<String> next) {
+        Set<String> before = new HashSet<>(previous);
+        Set<String> after = new HashSet<>(next);
+        List<String> added = next.stream().filter(id -> !before.contains(id)).toList();
+        List<String> removed = previous.stream().filter(id -> !after.contains(id)).toList();
+        List<String> messages = new ArrayList<>();
+        if (!added.isEmpty()) {
+            messages.add(message(added, "operation", "subscribe"));
+        }
+        if (!removed.isEmpty()) {
+            messages.add(message(removed, "operation", "unsubscribe"));
+        }
+        return messages;
+    }
+
+    private static String message(List<String> ids, String key, String value) {
+        JsonArray array = new JsonArray();
+        ids.forEach(array::add);
+        JsonObject msg = new JsonObject();
+        msg.add("assets_ids", array);
+        msg.addProperty(key, value);
+        return msg.toString();
     }
 
     @Override
@@ -95,12 +130,8 @@ public final class PolymarketWebSocketClient implements WebSocketPort {
     }
 
     private void sendSubscription(WebSocketClient ws) {
-        JsonArray ids = new JsonArray();
-        assetIds.forEach(ids::add);
-        JsonObject msg = new JsonObject();
-        msg.add("assets_ids", ids);
-        msg.addProperty("type", "market");
-        ws.send(msg.toString());
+        List<String> ids = assetIds;
+        ws.send(message(ids, "type", "market"));
         logger.info("Subscribed to {} assets", ids.size());
     }
 

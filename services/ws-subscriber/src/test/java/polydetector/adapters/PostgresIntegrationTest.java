@@ -26,7 +26,7 @@ class PostgresIntegrationTest {
 
     @Container
     static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>(
-            DockerImageName.parse("docker.io/timescale/timescaledb:latest-pg16").asCompatibleSubstituteFor("postgres"))
+            DockerImageName.parse("docker.io/timescale/timescaledb:2.26.1-pg16").asCompatibleSubstituteFor("postgres"))
             .withCopyFileToContainer(MountableFile.forHostPath("../../db/init/001_schema.sql"),
                     "/docker-entrypoint-initdb.d/001_schema.sql");
 
@@ -64,15 +64,17 @@ class PostgresIntegrationTest {
     }
 
     @Test
-    void assetSourceReturnsOnlyTokensClosingInsideWindow() throws Exception {
+    void assetSourceReturnsTokensClosingInsideWindowOrRecentlyEnded() throws Exception {
         try (Connection c = DriverManager.getConnection(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
              Statement s = c.createStatement()) {
             s.execute("INSERT INTO markets (condition_id, question, end_date, closed, outcomes, token_ids) VALUES "
                     + "('soon', 'q', now() + interval '2 hours', false, '{Yes,No}', '{t1,t2}'),"
                     + "('later', 'q', now() + interval '3 days', false, '{Yes,No}', '{t3,t4}'),"
-                    + "('done', 'q', now() + interval '1 hour', true, '{Yes,No}', '{t5,t6}')");
+                    + "('done', 'q', now() + interval '1 hour', true, '{Yes,No}', '{t5,t6}'),"
+                    + "('ended', 'q', now() - interval '1 hour', false, '{Yes,No}', '{t7,t8}'),"
+                    + "('long-gone', 'q', now() - interval '10 hours', false, '{Yes,No}', '{t9,t0}')");
         }
-        var source = new PostgresAssetSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword(), 24);
-        assertEquals(List.of("t1", "t2"), source.activeAssetIds());
+        var source = new PostgresAssetSource(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword(), 24, 6);
+        assertEquals(List.of("t1", "t2", "t7", "t8"), source.activeAssetIds());
     }
 }

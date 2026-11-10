@@ -9,8 +9,10 @@ costs bandwidth, storage and WebSocket subscriptions.
 
 ## Decision
 Watch markets that (a) carry one of the tags in `tag_ids.json` and (b) close within
-`CLOSING_WINDOW_HOURS` (default 24). The poller filters through Gamma's `end_date_min/max`. The
-ws-subscriber and the trade polling read the same set from the `markets` table.
+`CLOSING_WINDOW_HOURS` (default 24), or whose `endDate` passed less than `CLOSING_GRACE_HOURS`
+(default 6) ago: trading often goes on until resolution, and the last minutes are the most interesting.
+The poller filters through Gamma's `end_date_min/max`. The ws-subscriber and the trade polling read the
+same set from the `markets` table.
 
 ## Consequences
 - Roughly 350 markets / 700 tokens at the default settings (measured 2026-11-10).

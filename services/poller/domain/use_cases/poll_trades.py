@@ -13,16 +13,19 @@ OVERLAP = timedelta(minutes=1)  # re-read a little; duplicates are dropped by th
 class PollTrades:
     """Use case: fetch new trades (with wallet) for markets that close within the window."""
 
-    def __init__(self, api: TradeApiPort, repo: RepositoryPort, window: timedelta, backfill: timedelta):
+    def __init__(
+        self, api: TradeApiPort, repo: RepositoryPort, window: timedelta, grace: timedelta, backfill: timedelta
+    ):
         self._api = api
         self._repo = repo
         self._window = window
+        self._grace = grace
         self._backfill = backfill
         # Up to when each market was fetched. Lost on restart; then the DB or the backfill decides.
         self._checked: dict[str, datetime] = {}
 
     def execute(self, now: datetime) -> int:
-        ids = self._repo.closing_market_ids(now, now + self._window)
+        ids = self._repo.closing_market_ids(now - self._grace, now + self._window)  # same range as PollMarkets
         total = 0
         for i in range(0, len(ids), BATCH_SIZE):
             batch = ids[i : i + BATCH_SIZE]
