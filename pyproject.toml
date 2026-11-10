@@ -15,7 +15,6 @@ ignore_missing_imports = true
 explicit_package_bases = true
 
 [tool.pytest.ini_options]
-testpaths = ["services"]
-pythonpath = ["."]
+testpaths = ["tests"]  # repo-wide checks; each service runs its own tests from its folder
 
 

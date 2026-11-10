@@ -5,10 +5,14 @@ import logging
 import os
 import sys
 import time
+from datetime import UTC, datetime, timedelta
 
+from adapters.data_api import DataApi
 from adapters.gamma_api import GammaApi
-from adapters.rabbitmq_publisher import RabbitMqPublisher
+from adapters.postgres_repository import PostgresRepository
 from domain.use_cases.poll_markets import PollMarkets
+from domain.use_cases.poll_trades import PollTrades
+from settings import DbSettings
 from utils import load_tag_ids
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -19,53 +23,29 @@ logging.basicConfig(
 logger = logging.getLogger("poller")
 
 
-# def load_tag_ids(path: str) -> list[int]:
-#     with open(path) as f:
-#         data = json.load(f)
-#     if not isinstance(data, list):
-#         data = [data]
-#     # Handle objects with 'id' field vs raw integers
-#     if data and isinstance(data[0], dict):
-#         return [int(item['id']) for item in data]
-#     return [int(i) for i in data]
-
-
 def main() -> None:
-    # Config
-    rmq_host = os.getenv("RABBITMQ_HOST", "localhost")
-    rmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-    rmq_user = os.getenv("RABBITMQ_USER", "guest")
-    rmq_pass = os.getenv("RABBITMQ_PASS", "guest")
-    gamma_url = os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com")
-    tag_ids_path = os.getenv("TAG_IDS_PATH", "/data/tag_ids.json")
+    tag_ids = load_tag_ids(os.getenv("TAG_IDS_PATH", "/data/tag_ids.json"))
     poll_interval = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
+    window = timedelta(hours=float(os.getenv("CLOSING_WINDOW_HOURS", "24")))
+    backfill = timedelta(hours=float(os.getenv("TRADE_BACKFILL_HOURS", "24")))
 
-    # Adapters
-    publisher = RabbitMqPublisher(host=rmq_host, port=rmq_port, user=rmq_user, password=rmq_pass)
-    publisher.connect()
+    repo = PostgresRepository(DbSettings.from_env())
+    poll_markets = PollMarkets(GammaApi(os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com")), repo, window)
+    poll_trades = PollTrades(
+        DataApi(os.getenv("DATA_API_URL", "https://data-api.polymarket.com")), repo, window, backfill
+    )
 
-    api = GammaApi(base_url=gamma_url)
-
-    # Use Case
-    use_case = PollMarkets(api=api, publisher=publisher)
-
-    # Load tag IDs
-    try:
-        tag_ids = load_tag_ids(tag_ids_path)
-    except FileNotFoundError:
-        logger.warning("tag_ids.json not found at %s – running with empty list", tag_ids_path)
-        tag_ids = []
-
-    logger.info("Poller started. %d tag IDs, interval=%ds", len(tag_ids), poll_interval)
-
-    # Main loop
+    logger.info("Poller started. %d tag IDs, window=%s, interval=%ds", len(tag_ids), window, poll_interval)
     while True:
+        started = time.monotonic()
+        now = datetime.now(UTC)
         try:
-            count = use_case.execute(tag_ids)
-            logger.info("Polled %d markets", count)
+            markets = poll_markets.execute(tag_ids, now)
+            trades = poll_trades.execute(now)
+            logger.info("Cycle done: %d markets, %d trades", markets, trades)
         except Exception as e:
             logger.error("Poll cycle failed: %s", e)
-        time.sleep(poll_interval)
+        time.sleep(max(0.0, poll_interval - (time.monotonic() - started)))
 
 
 if __name__ == "__main__":

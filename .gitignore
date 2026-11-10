@@ -6,12 +6,17 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
 
 # Java/Gradle
 .gradle/
 build/
 target/
 *.jar
+dependency-reduced-pom.xml
 
 # IDE
 .idea/
@@ -25,3 +30,6 @@ Thumbs.db
 # continue context files
 PLAN.md
 readiness_check.md
+
+# Claude Code local settings
+.claude/settings.local.json*

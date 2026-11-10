@@ -1,36 +1,32 @@
 import logging
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 from domain.entities import Market
-from domain.use_cases.ports import MarketApiPort, MessagePublisherPort
+from domain.use_cases.ports import MarketApiPort, RepositoryPort
 
 logger = logging.getLogger(__name__)
 
 
 class PollMarkets:
-    """Use Case: Ruft Märkte für gegebene Tag-IDs ab und publisht sie."""
+    """Use case: load markets of interesting tags that close within the window and store them."""
 
-    def __init__(self, api: MarketApiPort, publisher: MessagePublisherPort):
+    def __init__(self, api: MarketApiPort, repo: RepositoryPort, window: timedelta):
         self._api = api
-        self._publisher = publisher
+        self._repo = repo
+        self._window = window
 
-    def execute(self, tag_ids: list[int]) -> int:
-        count = 0
+    def execute(self, tag_ids: list[int], now: datetime) -> int:
+        by_id: dict[str, Market] = {}
         for tid in tag_ids:
             try:
-                raw_markets = self._api.fetch_markets(tid)
-                for raw in raw_markets:
-                    market = Market(condition_id=raw.get("condition_id", ""))
-                    enriched = {
-                        "condition_id": market.condition_id,
-                        "question": raw.get("question"),
-                        "outcomes": raw.get("outcomes"),
-                        "volume": raw.get("volume"),
-                        "end_date": raw.get("end_date"),
-                        "_source": "poller",
-                        "tag_id": tid,
-                    }
-                    self._publisher.publish("markets.raw", enriched)
-                    count += 1
+                markets = self._api.fetch_closing_markets(tid, now, now + self._window)
             except Exception as e:
                 logger.error("Failed to poll tag_id=%s: %s", tid, e)
-        return count
+                continue
+            for m in markets:
+                seen = by_id.get(m.condition_id)
+                # A market can carry several interesting tags: store it once with all of them.
+                by_id[m.condition_id] = m if seen is None else replace(seen, tag_ids=seen.tag_ids + m.tag_ids)
+        self._repo.save_markets(list(by_id.values()), now)
+        return len(by_id)
