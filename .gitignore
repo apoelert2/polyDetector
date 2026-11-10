@@ -33,6 +33,7 @@ readiness_check.md
 
 # Claude Code local settings
 .claude/settings.local.json*
+.claude
 
 # DB dumps (scripts/backup.sh)
 backups/
