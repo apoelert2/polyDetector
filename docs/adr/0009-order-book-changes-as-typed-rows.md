@@ -24,6 +24,13 @@ A `price_change` that cannot be split (missing field, number that does not parse
 The writer also treats constraint violations (SQL state class 23) like data errors: it drops that batch
 and logs it, instead of retrying it forever and blocking the queue.
 
+## Result (measured)
+A 6-minute sample of the new table (141,548 rows, 446 assets): 233 bytes/row uncompressed, 23 bytes/row
+compressed (factor 11.8). At about 22,000 rows/min that is about 0.75 GB per day, or about 22 GB per
+month, compared with more than 100 GB for raw JSON. The extra `(asset_id, time)` index that was in the
+first version was as large as the table (25 MB for 33 MB), so it was dropped: compressed chunks are
+segmented by asset and need no index.
+
 ## Consequences
 - Much smaller data, and queries like "best bid of an asset over time" need no JSON parsing.
 - Full order-book depth over time can no longer be rebuilt from the changes alone. Each `book`

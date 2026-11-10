@@ -48,7 +48,9 @@ ALTER TABLE ws_events SET (timescaledb.compress, timescaledb.compress_segmentby 
 SELECT add_compression_policy('ws_events', INTERVAL '1 day');
 
 -- Order-book changes, one row per changed asset. Typed columns instead of a ~660 byte JSON per event.
--- segmentby asset_id: compression stores each asset's series together (time deltas, price runs).
+-- segmentby asset_id: compression stores each asset's series together (time deltas, price runs), and
+-- reads of one asset in compressed chunks are fast without an index. An (asset_id, time) index would be
+-- as big as the table itself (measured: 25 MB for a 33 MB table) for the one uncompressed day only.
 CREATE TABLE price_changes (
     time        timestamptz      NOT NULL,  -- event time from Polymarket
     received_at timestamptz      NOT NULL,  -- our clock
@@ -61,7 +63,6 @@ CREATE TABLE price_changes (
     best_ask    double precision
 );
 SELECT create_hypertable('price_changes', 'time', chunk_time_interval => INTERVAL '1 day');
-CREATE INDEX ON price_changes (asset_id, time DESC);
 ALTER TABLE price_changes SET (timescaledb.compress, timescaledb.compress_segmentby = 'asset_id',
                                timescaledb.compress_orderby = 'time DESC');
 SELECT add_compression_policy('price_changes', INTERVAL '1 day');
