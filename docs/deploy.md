@@ -29,12 +29,26 @@ usermod -aG docker deploy
 > Note: membership in the `docker` group is equivalent to root on that machine. The forced command
 > in step 2 is what keeps the CI key from using it. If that is not enough, switch to rootless Docker.
 
-4. As `deploy`:
+4. **Attach the block storage and put the database on it.** By default Docker keeps volumes on the system
+   disk. If you only add a block-storage volume, the database still fills the system disk. In the Hetzner
+   console create the volume, attach it to the server and choose "ext4" with automatic mounting, then:
+
+```bash
+sudo mkdir -p /mnt/data/postgres            # mount path shown in the Hetzner console; use a subdirectory
+sudo chown 70:70 /mnt/data/postgres         # uid 70 = postgres in the TimescaleDB image
+df -h /mnt/data                             # must show the volume's size, not the system disk's
+```
+
+   The subdirectory matters: a fresh ext4 volume has a `lost+found` folder in its root, and Postgres
+   refuses to start in a directory that is not empty. In step 5, set `TIMESCALE_DATA_DIR=/mnt/data/postgres`
+   in `.env`.
+
+5. As `deploy`:
 
 ```bash
 git clone https://github.com/<owner>/polyDetector.git ~/polydetector
 cd ~/polydetector
-cp .env.example .env && chmod 600 .env   # set a NEW TIMESCALE_PASS (openssl rand -hex 24) and GHCR_OWNER
+cp .env.example .env && chmod 600 .env   # set a NEW TIMESCALE_PASS (openssl rand -hex 24), GHCR_OWNER and TIMESCALE_DATA_DIR
 ```
 
 ## 2. Deploy key (CI → server)
@@ -105,6 +119,21 @@ compose exec -T timescaledb sh -c 'psql -U "$POSTGRES_USER" -d restored -c "SELE
 
 ## Sizing
 
-Measured locally (2026-11-10, ~700 tokens, 24 h window): about 370 MB RAM for all services and
-roughly 16 GB/day of raw WebSocket events before compression (compression after 1 day). Measure the
-compressed size for a day before choosing the disk: `SELECT pg_size_pretty(hypertable_size('ws_events'));`
+Measured locally on 2026-11-10 (about 700 tokens, 24 h window, mid-day Europe):
+
+| | Value |
+|---|---|
+| RAM, all services | about 370 MB |
+| order-book changes | about 22,000 rows/min |
+| uncompressed (table + time index) | about 260 bytes/row, so about 8 GB per day for the current day |
+| compressed (1 day after it ended) | about 23 bytes/row on a 6-minute sample (factor 11.8), so about 0.75 GB per day |
+
+That is about **22 GB per month compressed, plus about 17 GB for the two newest, still uncompressed
+days**. A 100 GB block storage leaves plenty of room. The rate depends on market activity (it will be
+lower at night), and a full day compresses better than the small sample. Check it after a few days:
+
+```sql
+SELECT pg_size_pretty(hypertable_size('price_changes')) AS total,
+       pg_size_pretty(after_compression_total_bytes) AS compressed_part
+FROM hypertable_compression_stats('price_changes');
+```

@@ -22,7 +22,8 @@ services:
       POSTGRES_USER: ${TIMESCALE_USER:?set TIMESCALE_USER in .env}
       POSTGRES_PASSWORD: ${TIMESCALE_PASS:?set TIMESCALE_PASS in .env}
     volumes:
-      - timescale_data:/var/lib/postgresql/data
+      # Named volume by default. On the server set TIMESCALE_DATA_DIR to a path on the block storage.
+      - ${TIMESCALE_DATA_DIR:-timescale_data}:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
