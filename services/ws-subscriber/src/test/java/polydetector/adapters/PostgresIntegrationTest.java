@@ -73,6 +73,19 @@ class PostgresIntegrationTest {
     }
 
     @Test
+    void sinkDropsBatchWithConstraintViolationAndKeepsWriting() throws Exception {
+        Instant t = Instant.now();
+        try (var sink = new PostgresEventSink(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword(), 100)) {
+            // eventType null violates NOT NULL (SQL state 23): this batch must be dropped, not retried forever.
+            sink.write(new WsEvent(t, t, null, "0xbad", null, 0, "{}"));
+            Awaitility.await().atMost(Duration.ofSeconds(5)).pollDelay(Duration.ofMillis(500)).until(() -> true);
+            sink.write(new WsEvent(t, t, "book", "0xgood", "a", 0, "{}"));
+        }
+        assertEquals(1, count("SELECT count(*) FROM ws_events WHERE market = '0xgood'"));
+        assertEquals(0, count("SELECT count(*) FROM ws_events WHERE market = '0xbad'"));
+    }
+
+    @Test
     void sinkDropsWhenQueueIsFullInsteadOfBlocking() throws Exception {
         Instant t = Instant.now();
         // Wrong password: every write fails, the queue (capacity 1) fills and the rest is dropped.

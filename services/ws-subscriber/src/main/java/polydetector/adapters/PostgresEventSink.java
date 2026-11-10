@@ -101,6 +101,11 @@ public final class PostgresEventSink implements EventSinkPort, AutoCloseable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            } catch (RuntimeException e) {
+                // Unexpected bug in one batch: drop it rather than let the writer thread die silently.
+                closeConnection();
+                logger.error("Dropping batch of {} after unexpected error", batch.size(), e);
+                batch.clear();
             } catch (SQLException e) {
                 closeConnection();
                 String state = e.getSQLState();
@@ -131,7 +136,9 @@ public final class PostgresEventSink implements EventSinkPort, AutoCloseable {
                     if (rows.isEmpty()) {
                         addRaw(events, e);
                     } else {
-                        rows.forEach(row -> addChange(changes, row));
+                        for (PriceChange row : rows) {
+                            addChange(changes, row);
+                        }
                     }
                 } else if (item instanceof Spike s) {
                     spikes.setObject(1, utc(s.time()));
@@ -172,21 +179,17 @@ public final class PostgresEventSink implements EventSinkPort, AutoCloseable {
         events.addBatch();
     }
 
-    private static void addChange(PreparedStatement changes, PriceChange c) {
-        try {
-            changes.setObject(1, utc(c.time()));
-            changes.setObject(2, utc(c.receivedAt()));
-            changes.setString(3, c.market());
-            changes.setString(4, c.assetId());
-            changes.setDouble(5, c.price());
-            changes.setDouble(6, c.size());
-            changes.setString(7, c.side());
-            setNullableDouble(changes, 8, c.bestBid());
-            setNullableDouble(changes, 9, c.bestAsk());
-            changes.addBatch();
-        } catch (SQLException ex) {
-            throw new IllegalStateException(ex);
-        }
+    private static void addChange(PreparedStatement changes, PriceChange c) throws SQLException {
+        changes.setObject(1, utc(c.time()));
+        changes.setObject(2, utc(c.receivedAt()));
+        changes.setString(3, c.market());
+        changes.setString(4, c.assetId());
+        changes.setDouble(5, c.price());
+        changes.setDouble(6, c.size());
+        changes.setString(7, c.side());
+        setNullableDouble(changes, 8, c.bestBid());
+        setNullableDouble(changes, 9, c.bestAsk());
+        changes.addBatch();
     }
 
     private static void setNullableDouble(PreparedStatement ps, int index, Double value) throws SQLException {
