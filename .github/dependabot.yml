@@ -3,5 +3,6 @@ updates:
   # Keeps the SHA-pinned actions in .github/workflows up to date via pull requests.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop  # git flow: updates go through develop, never straight to main
     schedule:
       interval: weekly
