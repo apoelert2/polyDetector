@@ -1,0 +1,39 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Java/Gradle
+.gradle/
+build/
+target/
+*.jar
+dependency-reduced-pom.xml
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# continue context files
+PLAN.md
+readiness_check.md
+
+# Claude Code local settings
+.claude/settings.local.json*
+.claude
+
+# DB dumps (scripts/backup.sh)
+backups/

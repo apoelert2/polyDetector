@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "proxy_wallet": "0xd04cadccd8e26ca5d40f6aff23f7a3634b3e39cb",
+      "side": "SELL",
+      "token_id": "85316229159726491323016745430264929009132978633380824091870535200778089396478",
+      "condition_id": "0xf25ca99a663e404f5dbaa7816c5f4568d82d7c3ee283535972ec4c6acfa7a328",
+      "size": 20.27,
+      "price": 0.982,
+      "timestamp": 1794283773,
+      "outcome": "Yes",
+      "transaction_hash": "0x0c479ee7399f0defe16e1162020f0a41111fd8a8bca54f7bb65fc0d9789af4bb"
+    },
+    {
+      "proxy_wallet": "0xec25c44518e113a23b708070ed960d54ad83dec6",
+      "side": "BUY",
+      "token_id": "85316229159726491323016745430264929009132978633380824091870535200778089396478",
+      "condition_id": "0xf25ca99a663e404f5dbaa7816c5f4568d82d7c3ee283535972ec4c6acfa7a328",
+      "size": 25.0,
+      "price": 0.99,
+      "timestamp": 1794275161,
+      "outcome": "Yes",
+      "transaction_hash": "0x7c20731974b53d3370eb44c70342ecee1890341e2bcc0159a96c77cafb08ea71"
+    }
+  ],
+  "pagination": {
+    "limit": 2,
+    "offset": 0,
+    "has_more": true,
+    "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJ0cmFkZXMiLCJwYXJhbXMiOnsibCI6MiwidHMiOjE3OTQyNzUxNjEsInNxIjoiOTcwNDY0NzAwMDAzMjA0NDMwIiwiZCI6Mn19LCJzaWciOiIxZDQxZmNmMDA2YWQ5N2Y3YzM4NDVhNDZhNzhkN2U2ZSJ9"
+  }
+}
