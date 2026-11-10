@@ -1,75 +1,66 @@
+# Works with `podman compose` and `docker compose`.
+# Credentials come only from .env (see .env.example); compose refuses to start if they are missing.
+# This file runs prebuilt images (server). Locally, docker-compose.override.yaml is merged in
+# automatically and builds from source instead.
+
+x-db-env: &db-env
+  TIMESCALE_HOST: timescaledb
+  TIMESCALE_PORT: 5432
+  TIMESCALE_DB: ${TIMESCALE_DB:?set TIMESCALE_DB in .env}
+  TIMESCALE_USER: ${TIMESCALE_USER:?set TIMESCALE_USER in .env}
+  TIMESCALE_PASS: ${TIMESCALE_PASS:?set TIMESCALE_PASS in .env}
+  CLOSING_WINDOW_HOURS: ${CLOSING_WINDOW_HOURS:-24}
+  CLOSING_GRACE_HOURS: ${CLOSING_GRACE_HOURS:-6}
+
 services:
-  rabbitmq:
-    image: docker.io/library/rabbitmq:3.13-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-secret_cookie_value}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq:Z
-    userns_mode: "keep-id:uid=999,gid=999"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - polydetector
-
   timescaledb:
-    image: docker.io/timescale/timescaledb:latest-pg16
+    image: docker.io/timescale/timescaledb:2.26.1-pg16  # pinned: a deploy must never upgrade the DB by surprise
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # localhost only; on the VPS use an SSH tunnel
     environment:
-      POSTGRES_USER: ${TIMESCALE_USER:-poly}
-      POSTGRES_PASSWORD: ${TIMESCALE_PASS:-poly_secret}
-      POSTGRES_DB: ${TIMESCALE_DB:-poly_detector}
+      POSTGRES_DB: ${TIMESCALE_DB:?set TIMESCALE_DB in .env}
+      POSTGRES_USER: ${TIMESCALE_USER:?set TIMESCALE_USER in .env}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASS:?set TIMESCALE_PASS in .env}
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro,Z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALE_USER:-poly} -d ${TIMESCALE_DB:-poly_detector}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - polydetector
-
-  extractor:
-    build:
-      context: ./services/extractor
-      dockerfile: Dockerfile
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      INPUT_QUEUE: markets.raw
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     restart: unless-stopped
     networks:
       - polydetector
 
   poller:
-    build:
-      context: ./services/poller
-      dockerfile: Dockerfile
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/polydetector-poller:${IMAGE_TAG:-latest}
     depends_on:
-      rabbitmq:
+      timescaledb:
         condition: service_healthy
     environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+      <<: *db-env
       TAG_IDS_PATH: /data/tag_ids.json
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      TRADE_BACKFILL_HOURS: ${TRADE_BACKFILL_HOURS:-24}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - ./tag_ids.json:/data/tag_ids.json:ro,Z
+    restart: unless-stopped
+    networks:
+      - polydetector
+
+  ws-subscriber:
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/polydetector-ws-subscriber:${IMAGE_TAG:-latest}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      <<: *db-env
+      SPIKE_WINDOW_MINUTES: ${SPIKE_WINDOW_MINUTES:-5}
+      SPIKE_HISTORY_MINUTES: ${SPIKE_HISTORY_MINUTES:-60}
+      SPIKE_FACTOR: ${SPIKE_FACTOR:-5}
+      SPIKE_MIN_NOTIONAL: ${SPIKE_MIN_NOTIONAL:-1000}
     restart: unless-stopped
     networks:
       - polydetector
@@ -79,4 +70,4 @@ networks:
     driver: bridge
 
 volumes:
-  rabbitmq_data:
+  timescale_data:

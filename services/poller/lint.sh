@@ -10,5 +10,5 @@ mypy . --strict
 echo "=== bandit ==="
 bandit -r . -ll
 echo "=== pytest ==="
-pytest -v || echo "No tests yet - skipping"
+python -m pytest -q
 echo "=== ALL CHECKS PASSED ==="

@@ -1,116 +1,78 @@
 # polyDetector
 
-A containerized data pipeline for Polymarket prediction markets. Long-term goal: detect insider trading by correlating on-chain activity with market movements.
+A data pipeline that watches Polymarket prediction markets shortly before they close, to find
+patterns that suggest insider trading: unusual volume spikes and the wallets behind them.
 
----
+The first phase collects about a month of data on a VPS. That data is used to design and backtest
+detection strategies, and later to test them live as signals only. No real money is traded
+([ADR 7](docs/adr/0007-paper-trading-only.md)). Comparing other prediction markets (Kalshi first) is
+planned.
 
 ## Architecture
 
 ```
-Poller ──→ Queue "markets.raw" ──→ Extractor ──→ Queue "markets.enriched" ──→ Storage ──→ TimescaleDB
-
-WS-Subscriber ──→ Queue "ws_raw" ────────────────────────────────────────────────→ Storage ──→ TimescaleDB
+            ┌──────────────── ws-subscriber (Java 25, one process) ────────────────┐
+Polymarket ─┤ WebSocket client → SpikeDetector (in memory) → log + spikes table    │
+ market WS  │          └──────→ batch writer (own thread, never blocks) ───────────┼──→ TimescaleDB
+            └───────────────────────────────────────────────────────────────────────┘        ▲
+Gamma API ───→ poller (Python 3.12, every 60 s): markets + price snapshots ──────────────────┤
+Data API v2 ─→           …and trades with wallet + transaction hash ────────────────────────┘
 ```
 
-Every service follows **Clean Architecture** (Entities → Use Cases → Adapters → Composition Root) and is independently containerizable.
+- **Watch list:** markets with a tag from [`tag_ids.json`](tag_ids.json) that close within 24 h
+  ([ADR 5](docs/adr/0005-watch-only-markets-closing-soon.md)).
+- **Hot path:** spikes are detected in the WebSocket process before anything is stored
+  ([ADR 3](docs/adr/0003-java-hot-path-with-in-process-spike-detection.md)).
+- **Who traded:** wallet-level trades from the Data API, joinable to live events via `transaction_hash`
+  ([ADR 4](docs/adr/0004-wallet-trades-from-data-api-v2.md)).
+- **No broker:** services share one DB schema, [`db/init/001_schema.sql`](db/init/001_schema.sql)
+  ([ADR 2](docs/adr/0002-services-write-directly-to-timescaledb.md)).
 
-### Services
+Each service follows Clean Architecture: entities → use cases with ports → adapters → composition root.
 
-| Service | Language | Task |
-|---------|----------|------|
-| **Poller** | Python 3.12 | Fetches Polymarket Gamma API, publishes raw data to `markets.raw` |
-| **Extractor** | Python 3.12 | Consumes `markets.raw`, enriches with volume/liquidity/spread, publishes to `markets.enriched` |
-| **WS-Subscriber** | Java 25+ | WebSocket client for real-time data |
-| **Storage** | Java 25+ | Persists data to TimescaleDB |
-| **Pipeline-Monitor** | Python 3.12 | Monitors health and throughput |
+| Table | Written by | Content |
+|-------|-----------|---------|
+| `markets` | poller | current state per market, incl. token ids |
+| `market_snapshots` | poller | prices, volume, liquidity per poll |
+| `trades` | poller | trades with proxy wallet and tx hash |
+| `ws_events` | ws-subscriber | every WebSocket event, raw JSON (compressed after 1 day) |
+| `spikes` | ws-subscriber | detected volume spikes |
 
-### Infrastructure
-
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| RabbitMQ | 3.13-management | Message broker |
-| TimescaleDB | latest-pg16 | Time-series database |
-| Podman | rootless | Container orchestration |
-
----
-
-## Quick Start
+## Quick start
 
 ```bash
-# 1. Clone repository
-git clone <repo-url>
-cd polyDetector
-
-# 2. Create .env (optional)
-cp .env.example .env
-
-# 3. Start all services
-podman compose up -d --build
-
-# 4. Check logs
-podman compose logs -f
-
-# 5. Run smoke tests
-python services/pipeline-monitor/smoke_test.py  # Poller pipeline
-python services/extractor/smoke_test.py          # Extractor pipeline (raw → enriched)
+cp .env.example .env              # set TIMESCALE_PASS and GHCR_OWNER
+podman compose up -d --build      # builds locally via docker-compose.override.yaml; docker compose works too
+scripts/smoke_test.sh             # waits until real data is in every table
 ```
 
-### Individual Services
+Settings (watch window, spike thresholds, …) are listed in [`.env.example`](.env.example).
+The DB listens on `127.0.0.1:5432` only. On a server, use an SSH tunnel.
 
-```bash
-# Start only the poller
-podman compose up -d --build poller
-
-# Poller logs only
-podman compose logs -f poller
-```
-
----
+**Deployment:** every merge to `main` runs the checks, pushes images to ghcr.io and deploys to the VPS.
+Setup, backups and alarm: [docs/deploy.md](docs/deploy.md).
 
 ## Development
 
-### Prerequisites
-
-- Podman (rootless)
-- Python 3.12+
-- Java 25+ (for WS-Subscriber and Storage)
-- Gradle or Maven (for Java services)
-
-### Linting & Tests
-
-Every service has its own `lint.sh`:
+Requirements: Podman (rootless, `podman.socket` enabled for Testcontainers), Python 3.12+, Java 25, Maven.
 
 ```bash
-bash services/poller/lint.sh
+bash services/poller/lint.sh          # ruff, mypy --strict, bandit, pytest
+bash services/ws-subscriber/lint.sh   # checkstyle, spotbugs, tests incl. TimescaleDB integration, jacoco
+python -m pytest                      # repo-wide secret scan (no passwords, keys, IPs in tracked files)
 ```
-
-Includes: Ruff, MyPy, Bandit, Pytest (Python) / Checkstyle, SpotBugs, JaCoCo (Java).
-
-### Project Structure
 
 ```
 polyDetector/
-├── docker-compose.yaml       # Service definitions
-├── .env.example              # Environment variables (template)
-├── pyproject.toml            # Python tool configuration
-├── tag_ids.json              # Polymarket tag IDs
-├── PLAN.md                   # Project plan & roadmap
-├── README.md                 # This file
-└── services/
-    ├── poller/               # Phase 1
-    ├── extractor/            # Phase 2
-    ├── ws-subscriber/        # Phase 3
-    ├── storage/              # Phase 4
-    └── pipeline-monitor/     # Phase 5
+├── db/init/              # DB schema, applied on first start
+├── docs/                 # ADRs, deploy guide
+├── scripts/              # smoke test, deploy, backup, healthcheck
+├── services/
+│   ├── poller/           # Python: Gamma markets + Data API trades
+│   └── ws-subscriber/    # Java: WebSocket, spike detection
+├── tests/                # repo-wide checks
+└── tag_ids.json          # tags to watch
 ```
-
----
-
-## Project Plan
-
-The full plan with phases, milestones, and architecture decisions is in **[PLAN.md](PLAN.md)**.
-
----
 
 ## License
 

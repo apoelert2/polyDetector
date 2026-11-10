@@ -1,0 +1,7 @@
+# Local development: build the images from source. Merged automatically by `compose up`.
+# On the server this file is not present, so the prebuilt images from docker-compose.yaml are used.
+services:
+  poller:
+    build: ./services/poller
+  ws-subscriber:
+    build: ./services/ws-subscriber
