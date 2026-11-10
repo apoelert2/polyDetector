@@ -49,6 +49,9 @@ scripts/smoke_test.sh             # waits until real data is in every table
 Settings (watch window, spike thresholds, …) are listed in [`.env.example`](.env.example).
 The DB listens on `127.0.0.1:5432` only. On a server, use an SSH tunnel.
 
+**Deployment:** every merge to `main` runs the checks, pushes images to ghcr.io and deploys to the VPS.
+Setup, backups and alarm: [docs/deploy.md](docs/deploy.md).
+
 ## Development
 
 Requirements: Podman (rootless, `podman.socket` enabled for Testcontainers), Python 3.12+, Java 25, Maven.
@@ -62,8 +65,8 @@ python -m pytest                      # repo-wide secret scan (no passwords, key
 ```
 polyDetector/
 ├── db/init/              # DB schema, applied on first start
-├── docs/adr/             # architecture decision records
-├── scripts/smoke_test.sh # end-to-end check against the running stack
+├── docs/                 # ADRs, deploy guide
+├── scripts/              # smoke test, deploy, backup, healthcheck
 ├── services/
 │   ├── poller/           # Python: Gamma markets + Data API trades
 │   └── ws-subscriber/    # Java: WebSocket, spike detection

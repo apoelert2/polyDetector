@@ -13,3 +13,4 @@ A decision is never edited after it is accepted; a new ADR supersedes it.
 | [0005](0005-watch-only-markets-closing-soon.md) | Watch only markets of chosen tags that close soon | Accepted |
 | [0006](0006-secrets-only-in-environment.md) | Secrets only in the environment, enforced by tests | Accepted |
 | [0007](0007-paper-trading-only.md) | Paper trading only | Accepted |
+| [0008](0008-pull-based-deploy-with-forced-command-key.md) | Pull-based deploy with a forced-command SSH key | Accepted |
