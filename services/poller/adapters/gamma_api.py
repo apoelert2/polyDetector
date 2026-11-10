@@ -4,11 +4,12 @@ from datetime import datetime
 from typing import Any
 
 import requests
-from domain.entities import Market
-from domain.use_cases.ports import MarketApiPort
+from domain.entities import Market, Resolution
+from domain.use_cases.ports import MarketApiPort, ResolutionApiPort
 
 logger = logging.getLogger(__name__)
 
+RESOLUTION_BATCH = 20  # condition_ids per request, keeps the URL short
 PAGE_SIZE = 100  # Gamma returns at most 100 markets per request
 
 
@@ -48,7 +49,32 @@ def parse_market(raw: dict[str, Any], tag_id: int) -> Market | None:
     )
 
 
-class GammaApi(MarketApiPort):
+WIN_THRESHOLD = 0.99  # final price of the winning outcome is 1; anything lower (50/50 refund) has no winner
+
+
+def parse_resolution(raw: dict[str, Any]) -> Resolution | None:
+    """None while the market is not resolved yet (or if Gamma lacks the data to say who won)."""
+    closed_time = raw.get("closedTime")
+    if not (
+        raw.get("closed") and raw.get("umaResolutionStatus") == "resolved" and closed_time and raw.get("conditionId")
+    ):
+        return None
+    prices = tuple(float(p) for p in _json_list(raw.get("outcomePrices")))
+    outcomes = [str(o) for o in _json_list(raw.get("outcomes"))]
+    tokens = [str(t) for t in _json_list(raw.get("clobTokenIds"))]
+    winner = next((i for i, p in enumerate(prices) if p >= WIN_THRESHOLD), None)
+    if winner is not None and not (winner < len(outcomes) and winner < len(tokens)):
+        return None
+    return Resolution(
+        condition_id=raw["conditionId"],
+        resolved_at=datetime.fromisoformat(closed_time),
+        winning_token_id=None if winner is None else tokens[winner],
+        winning_outcome=None if winner is None else outcomes[winner],
+        final_prices=prices,
+    )
+
+
+class GammaApi(MarketApiPort, ResolutionApiPort):
     def __init__(self, base_url: str, timeout: int = 30):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
@@ -74,3 +100,21 @@ class GammaApi(MarketApiPort):
             if len(page) < PAGE_SIZE:
                 return markets
             offset += PAGE_SIZE
+
+    def fetch_resolutions(self, condition_ids: list[str]) -> list[Resolution]:
+        resolutions: list[Resolution] = []
+        for i in range(0, len(condition_ids), RESOLUTION_BATCH):
+            params: dict[str, str | int | list[str]] = {
+                "condition_ids": condition_ids[i : i + RESOLUTION_BATCH],
+                "closed": "true",
+                "limit": PAGE_SIZE,
+            }
+            resp = self._session.get(f"{self._base_url}/markets", params=params, timeout=self._timeout)
+            resp.raise_for_status()
+            for raw in resp.json():
+                try:
+                    if r := parse_resolution(raw):
+                        resolutions.append(r)
+                except (ValueError, TypeError) as e:  # one odd record must not block the 19 others
+                    logger.warning("Skipping unreadable resolution of %s: %s", raw.get("conditionId"), e)
+        return resolutions
