@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adapters.data_api import parse_trade
-from adapters.gamma_api import parse_market
+from adapters.gamma_api import parse_market, parse_resolution
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -34,3 +34,22 @@ def test_parse_trade_maps_data_api_fields() -> None:
     assert t.transaction_hash == raw["transaction_hash"]
     assert t.time == datetime.fromtimestamp(raw["timestamp"], UTC)
     assert t.side in ("BUY", "SELL")
+
+
+def test_parse_resolution_finds_winner_from_real_response() -> None:
+    raw = json.loads((FIXTURES / "gamma_resolved_market.json").read_text())[0]
+    r = parse_resolution(raw)
+    assert r is not None
+    assert r.winning_outcome == "No"  # outcomePrices ["0", "1"]
+    assert r.winning_token_id == json.loads(raw["clobTokenIds"])[1]
+    assert r.resolved_at == datetime(2026, 8, 8, 20, 27, 18, tzinfo=UTC)
+
+
+def test_parse_resolution_unresolved_and_refund() -> None:
+    raw = json.loads((FIXTURES / "gamma_resolved_market.json").read_text())[0]
+    assert parse_resolution({**raw, "umaResolutionStatus": "proposed"}) is None
+    assert parse_resolution({**raw, "closed": False}) is None
+    refund = parse_resolution({**raw, "outcomePrices": '["0.5", "0.5"]'})
+    assert refund is not None
+    assert refund.winning_token_id is None
+    assert refund.final_prices == (0.5, 0.5)

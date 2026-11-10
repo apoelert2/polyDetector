@@ -29,3 +29,14 @@ class Trade:
     size: float
     price: float
     outcome: str | None
+
+
+@dataclass(frozen=True)
+class Resolution:
+    """Final outcome of a market. winning_token_id is None if no outcome won outright (e.g. a 50/50 refund)."""
+
+    condition_id: str
+    resolved_at: datetime
+    winning_token_id: str | None
+    winning_outcome: str | None
+    final_prices: tuple[float, ...]

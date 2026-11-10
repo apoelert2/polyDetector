@@ -17,6 +17,17 @@ CREATE TABLE markets (
 );
 CREATE INDEX markets_end_date_idx ON markets (end_date) WHERE NOT closed;
 
+-- Who won, written once per market when Polymarket reports it resolved (needed to backtest strategies).
+-- winning_* are NULL if no outcome won outright (e.g. a 50/50 refund); final_prices has the raw values.
+CREATE TABLE market_resolutions (
+    condition_id     text PRIMARY KEY,
+    resolved_at      timestamptz        NOT NULL,
+    winning_token_id text,
+    winning_outcome  text,
+    final_prices     double precision[] NOT NULL,
+    recorded_at      timestamptz        NOT NULL DEFAULT now()
+);
+
 -- Price/volume history per poll cycle (one row per market per poll).
 CREATE TABLE market_snapshots (
     time           timestamptz        NOT NULL,
