@@ -52,6 +52,27 @@ class PostgresIntegrationTest {
     }
 
     @Test
+    void sinkSplitsPriceChangesIntoTypedRowsAndKeepsMalformedOnesRaw() throws Exception {
+        Instant t = Instant.parse("2026-11-10T13:00:00Z");
+        String live = "{\"market\":\"0xpc\",\"price_changes\":["
+                + "{\"asset_id\":\"a1\",\"price\":\"0.148\",\"size\":\"700\",\"side\":\"BUY\","
+                + "\"best_bid\":\"0.162\",\"best_ask\":\"0.166\"},"
+                + "{\"asset_id\":\"a2\",\"price\":\"0.852\",\"size\":\"0\",\"side\":\"SELL\"}]}";
+        String broken = "{\"market\":\"0xbroken\",\"price_changes\":[{\"asset_id\":\"a3\",\"price\":\"x\"}]}";
+        try (var sink = new PostgresEventSink(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword(), 100)) {
+            sink.write(new WsEvent(t, t, "price_change", "0xpc", null, 0, live));
+            sink.write(new WsEvent(t, t, "price_change", "0xbroken", null, 0, broken));
+        }
+        assertEquals(2, count("SELECT count(*) FROM price_changes WHERE market = '0xpc'"));
+        assertEquals(1, count("SELECT count(*) FROM price_changes WHERE asset_id = 'a1' AND price = 0.148 "
+                + "AND size = 700 AND side = 'BUY' AND best_bid = 0.162 AND best_ask = 0.166"));
+        assertEquals(1, count("SELECT count(*) FROM price_changes WHERE asset_id = 'a2' AND best_bid IS NULL"));
+        assertEquals(0, count("SELECT count(*) FROM ws_events WHERE market = '0xpc'"));
+        assertEquals(1, count("SELECT count(*) FROM ws_events WHERE market = '0xbroken' "
+                + "AND event_type = 'price_change'"));
+    }
+
+    @Test
     void sinkDropsWhenQueueIsFullInsteadOfBlocking() throws Exception {
         Instant t = Instant.now();
         // Wrong password: every write fails, the queue (capacity 1) fills and the rest is dropped.

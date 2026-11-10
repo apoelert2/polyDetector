@@ -35,7 +35,8 @@ Each service follows Clean Architecture: entities → use cases with ports → a
 | `markets` | poller | current state per market, incl. token ids |
 | `market_snapshots` | poller | prices, volume, liquidity per poll |
 | `trades` | poller | trades with proxy wallet and tx hash |
-| `ws_events` | ws-subscriber | every WebSocket event, raw JSON (compressed after 1 day) |
+| `price_changes` | ws-subscriber | order-book changes, one typed row each (compressed after 1 day, [ADR 9](docs/adr/0009-order-book-changes-as-typed-rows.md)) |
+| `ws_events` | ws-subscriber | order-book snapshots, trades and other events, raw JSON |
 | `spikes` | ws-subscriber | detected volume spikes |
 
 ## Quick start

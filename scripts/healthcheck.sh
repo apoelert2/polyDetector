@@ -20,7 +20,7 @@ check() {  # name, sql returning a count
   ((10#${n:-0} > 0)) || failures+=("$1")
 }
 check "market snapshots (15 min)" "SELECT count(*) FROM market_snapshots WHERE time > now() - interval '15 minutes'"
-check "websocket events (15 min)" "SELECT count(*) FROM ws_events WHERE received_at > now() - interval '15 minutes'"
+check "order-book updates (15 min)" "SELECT count(*) FROM price_changes WHERE received_at > now() - interval '15 minutes'"
 # Trades can be quiet at night; one hour is a safer window.
 check "trades (1 h)" "SELECT count(*) FROM trades WHERE time > now() - interval '1 hour'"
 

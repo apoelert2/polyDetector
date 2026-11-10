@@ -33,8 +33,8 @@ check "market snapshots with prices" \
   "SELECT count(*) FROM market_snapshots WHERE cardinality(outcome_prices) > 0" || status=1
 check "trades with wallet" \
   "SELECT count(*) FROM trades WHERE proxy_wallet LIKE '0x%'" || status=1
-check "websocket events" \
-  "SELECT count(*) FROM ws_events WHERE received_at > now() - interval '10 minutes'" || status=1
+check "order-book updates (price_changes)" \
+  "SELECT count(*) FROM price_changes WHERE received_at > now() - interval '10 minutes'" || status=1
 
 for svc in poller ws-subscriber; do
   if $COMPOSE logs "$svc" 2>&1 | grep -qE "\[ERROR\]|\"level\":\"ERROR\"|Traceback"; then
