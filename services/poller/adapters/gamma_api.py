@@ -111,5 +111,10 @@ class GammaApi(MarketApiPort, ResolutionApiPort):
             }
             resp = self._session.get(f"{self._base_url}/markets", params=params, timeout=self._timeout)
             resp.raise_for_status()
-            resolutions.extend(r for raw in resp.json() if (r := parse_resolution(raw)))
+            for raw in resp.json():
+                try:
+                    if r := parse_resolution(raw):
+                        resolutions.append(r)
+                except (ValueError, TypeError) as e:  # one odd record must not block the 19 others
+                    logger.warning("Skipping unreadable resolution of %s: %s", raw.get("conditionId"), e)
         return resolutions

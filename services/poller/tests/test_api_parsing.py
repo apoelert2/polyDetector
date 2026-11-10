@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adapters.data_api import parse_trade
-from adapters.gamma_api import parse_market, parse_resolution
+from adapters.gamma_api import GammaApi, parse_market, parse_resolution
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -53,3 +53,21 @@ def test_parse_resolution_unresolved_and_refund() -> None:
     assert refund is not None
     assert refund.winning_token_id is None
     assert refund.final_prices == (0.5, 0.5)
+
+
+def test_fetch_resolutions_skips_unreadable_record_and_keeps_the_rest() -> None:
+    good = json.loads((FIXTURES / "gamma_resolved_market.json").read_text())[0]
+    bad = {**good, "conditionId": "0xbad", "outcomePrices": '["x", "1"]'}
+
+    class FakeSession:
+        def get(self, *args: object, **kwargs: object) -> "FakeSession":
+            return self
+
+        def raise_for_status(self) -> None: ...
+
+        def json(self) -> list[dict[str, object]]:
+            return [bad, good]
+
+    api = GammaApi("http://gamma.test")
+    api._session = FakeSession()  # type: ignore[assignment]
+    assert [r.condition_id for r in api.fetch_resolutions(["0xbad", good["conditionId"]])] == [good["conditionId"]]
