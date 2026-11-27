@@ -6,5 +6,13 @@
     {"id": 102000, "label": "Macro Indicators"},
     {"id": 225, "label": "economics"},
     {"id": 100328, "label": "Economy"},
-    {"id": 120, "label": "Finance"}
+    {"id": 120, "label": "Finance"},
+    {"id": 833, "label": "ETF"},
+    {"id": 236, "label": "ETF approval"},
+    {"id": 131, "label": "interest rates"},
+    {"id": 103339, "label": "Fed Chair"},
+    {"id": 101737, "label": "Tariff"},
+    {"id": 103070, "label": "Nobel Peace Prize"},
+    {"id": 961, "label": "regulatory news"},
+    {"id": 104010, "label": "Iran Ceasefire"}
 ]
