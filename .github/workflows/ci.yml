@@ -57,7 +57,7 @@ jobs:
   images:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [secret-scan, poller, ws-subscriber]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm  # the server is ARM (Hetzner CAX): build natively, no emulation
     permissions:
       contents: read
       packages: write
@@ -76,6 +76,7 @@ jobs:
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: services/${{ matrix.service }}
+          platforms: linux/arm64
           push: true
           tags: |
             ghcr.io/${{ env.OWNER }}/polydetector-${{ matrix.service }}:${{ github.sha }}

@@ -14,3 +14,4 @@ A decision is never edited after it is accepted; a new ADR supersedes it.
 | [0006](0006-secrets-only-in-environment.md) | Secrets only in the environment, enforced by tests | Accepted |
 | [0007](0007-paper-trading-only.md) | Paper trading only | Accepted |
 | [0008](0008-pull-based-deploy-with-forced-command-key.md) | Pull-based deploy with a forced-command SSH key | Accepted |
+| [0009](0009-order-book-changes-as-typed-rows.md) | Order-book changes as typed rows | Accepted |

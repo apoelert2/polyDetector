@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import psycopg
-from domain.entities import Market, Trade
+from domain.entities import Market, Resolution, Trade
 from domain.use_cases.ports import RepositoryPort
 from settings import DbSettings
 
@@ -23,6 +23,12 @@ INSERT_TRADE = """
 INSERT INTO trades (time, transaction_hash, condition_id, token_id, proxy_wallet, side, size, price, outcome)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT DO NOTHING
+"""
+
+INSERT_RESOLUTION = """
+INSERT INTO market_resolutions (condition_id, resolved_at, winning_token_id, winning_outcome, final_prices)
+VALUES (%s, %s, %s, %s, %s)
+ON CONFLICT (condition_id) DO NOTHING
 """
 
 
@@ -99,5 +105,27 @@ class PostgresRepository(RepositoryPort):
                         t.outcome,
                     )
                     for t in trades
+                ],
+            )
+
+    def unresolved_market_ids(self, ended_after: datetime, ended_before: datetime) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT m.condition_id FROM markets m "
+                "LEFT JOIN market_resolutions r USING (condition_id) "
+                "WHERE r.condition_id IS NULL AND m.end_date BETWEEN %s AND %s ORDER BY m.end_date",
+                (ended_after, ended_before),
+            ).fetchall()
+        return [str(r[0]) for r in rows]
+
+    def save_resolutions(self, resolutions: list[Resolution]) -> None:
+        if not resolutions:
+            return
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.executemany(
+                INSERT_RESOLUTION,
+                [
+                    (r.condition_id, r.resolved_at, r.winning_token_id, r.winning_outcome, list(r.final_prices))
+                    for r in resolutions
                 ],
             )

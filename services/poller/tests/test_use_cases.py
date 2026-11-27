@@ -2,10 +2,11 @@ from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from domain.entities import Market, Trade
+from domain.entities import Market, Resolution, Trade
 from domain.use_cases.poll_markets import PollMarkets
 from domain.use_cases.poll_trades import PollTrades
-from domain.use_cases.ports import MarketApiPort, RepositoryPort, TradeApiPort
+from domain.use_cases.ports import MarketApiPort, RepositoryPort, ResolutionApiPort, TradeApiPort
+from domain.use_cases.resolve_markets import ResolveMarkets
 
 NOW = datetime(2026, 11, 10, 12, tzinfo=UTC)
 MARKET = Market(
@@ -17,6 +18,8 @@ class FakeRepo(RepositoryPort):
     def __init__(self, ids: list[str] | None = None, latest: dict[str, datetime] | None = None):
         self.markets: list[Market] = []
         self.trades: list[Trade] = []
+        self.resolutions: list[Resolution] = []
+        self.unresolved_range: tuple[datetime, datetime] | None = None
         self._ids = ids or []
         self._latest = latest or {}
 
@@ -31,6 +34,13 @@ class FakeRepo(RepositoryPort):
 
     def save_trades(self, trades: list[Trade]) -> None:
         self.trades += trades
+
+    def unresolved_market_ids(self, ended_after: datetime, ended_before: datetime) -> list[str]:
+        self.unresolved_range = (ended_after, ended_before)
+        return self._ids
+
+    def save_resolutions(self, resolutions: list[Resolution]) -> None:
+        self.resolutions += resolutions
 
 
 class FakeMarketApi(MarketApiPort):
@@ -92,3 +102,27 @@ def test_poll_trades_second_cycle_does_not_reread_backfill() -> None:
     api.consumed = 0
     use_case.execute(NOW + timedelta(minutes=1))
     assert api.consumed <= 3  # stops near the last check, even though 0xquiet never had a trade
+
+
+class FakeResolutionApi(ResolutionApiPort):
+    def __init__(self, resolved: set[str]):
+        self._resolved = resolved
+        self.asked: list[list[str]] = []
+
+    def fetch_resolutions(self, condition_ids: list[str]) -> list[Resolution]:
+        self.asked.append(condition_ids)
+        return [Resolution(c, NOW, "1", "Yes", (1.0, 0.0)) for c in condition_ids if c in self._resolved]
+
+
+def test_resolve_markets_stores_only_resolved_and_limits_lookback() -> None:
+    repo = FakeRepo(ids=["0xa", "0xb"])
+    api = FakeResolutionApi({"0xa"})
+    assert ResolveMarkets(api, repo, timedelta(days=14)).execute(NOW) == 1
+    assert [r.condition_id for r in repo.resolutions] == ["0xa"]
+    assert repo.unresolved_range == (NOW - timedelta(days=14), NOW)
+
+
+def test_resolve_markets_does_not_call_api_when_nothing_is_pending() -> None:
+    api = FakeResolutionApi(set())
+    assert ResolveMarkets(api, FakeRepo(), timedelta(days=14)).execute(NOW) == 0
+    assert api.asked == []

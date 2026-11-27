@@ -12,6 +12,7 @@ from adapters.gamma_api import GammaApi
 from adapters.postgres_repository import PostgresRepository
 from domain.use_cases.poll_markets import PollMarkets
 from domain.use_cases.poll_trades import PollTrades
+from domain.use_cases.resolve_markets import ResolveMarkets
 from settings import DbSettings
 from utils import load_tag_ids
 
@@ -31,9 +32,9 @@ def main() -> None:
     backfill = timedelta(hours=float(os.getenv("TRADE_BACKFILL_HOURS", "24")))
 
     repo = PostgresRepository(DbSettings.from_env())
-    poll_markets = PollMarkets(
-        GammaApi(os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com")), repo, window, grace
-    )
+    gamma = GammaApi(os.getenv("GAMMA_API_URL", "https://gamma-api.polymarket.com"))
+    poll_markets = PollMarkets(gamma, repo, window, grace)
+    resolve_markets = ResolveMarkets(gamma, repo, timedelta(days=float(os.getenv("RESOLUTION_LOOKBACK_DAYS", "14"))))
     poll_trades = PollTrades(
         DataApi(os.getenv("DATA_API_URL", "https://data-api.polymarket.com")), repo, window, grace, backfill
     )
@@ -47,7 +48,8 @@ def main() -> None:
         try:
             markets = poll_markets.execute(tag_ids, now)
             trades = poll_trades.execute(now)
-            logger.info("Cycle done: %d markets, %d trades", markets, trades)
+            resolved = resolve_markets.execute(now)
+            logger.info("Cycle done: %d markets, %d trades, %d newly resolved", markets, trades, resolved)
         except Exception as e:
             logger.error("Poll cycle failed: %s", e)
         time.sleep(max(0.0, poll_interval - (time.monotonic() - started)))

@@ -17,6 +17,17 @@ CREATE TABLE markets (
 );
 CREATE INDEX markets_end_date_idx ON markets (end_date) WHERE NOT closed;
 
+-- Who won, written once per market when Polymarket reports it resolved (needed to backtest strategies).
+-- winning_* are NULL if no outcome won outright (e.g. a 50/50 refund); final_prices has the raw values.
+CREATE TABLE market_resolutions (
+    condition_id     text PRIMARY KEY,
+    resolved_at      timestamptz        NOT NULL,
+    winning_token_id text,
+    winning_outcome  text,
+    final_prices     double precision[] NOT NULL,
+    recorded_at      timestamptz        NOT NULL DEFAULT now()
+);
+
 -- Price/volume history per poll cycle (one row per market per poll).
 CREATE TABLE market_snapshots (
     time           timestamptz        NOT NULL,
@@ -29,8 +40,9 @@ CREATE TABLE market_snapshots (
 SELECT create_hypertable('market_snapshots', 'time');
 CREATE INDEX ON market_snapshots (condition_id, time DESC);
 
--- Every WebSocket event as received (book, price_change, last_trade_price, ...).
--- Raw payload is kept so later backtests can re-derive anything.
+-- WebSocket events kept raw: order-book snapshots (book), trades (last_trade_price), tick size changes.
+-- price_change events (99.7 % of the feed) are split into typed rows in price_changes below; only a
+-- price_change that cannot be split ends up here.
 CREATE TABLE ws_events (
     time        timestamptz NOT NULL,  -- event time from Polymarket
     received_at timestamptz NOT NULL,  -- our clock, to measure feed latency
@@ -46,6 +58,26 @@ CREATE INDEX ON ws_events (market, time DESC);
 ALTER TABLE ws_events SET (timescaledb.compress, timescaledb.compress_segmentby = 'market');
 SELECT add_compression_policy('ws_events', INTERVAL '1 day');
 
+-- Order-book changes, one row per changed asset. Typed columns instead of a ~660 byte JSON per event.
+-- segmentby asset_id: compression stores each asset's series together (time deltas, price runs), and
+-- reads of one asset in compressed chunks are fast without an index. An (asset_id, time) index would be
+-- as big as the table itself (measured: 25 MB for a 33 MB table) for the one uncompressed day only.
+CREATE TABLE price_changes (
+    time        timestamptz      NOT NULL,  -- event time from Polymarket
+    received_at timestamptz      NOT NULL,  -- our clock
+    market      text             NOT NULL,
+    asset_id    text             NOT NULL,
+    price       double precision NOT NULL,
+    size        double precision NOT NULL,  -- new size at this price level; 0 = level removed
+    side        text             NOT NULL,
+    best_bid    double precision,
+    best_ask    double precision
+);
+SELECT create_hypertable('price_changes', 'time', chunk_time_interval => INTERVAL '1 day');
+ALTER TABLE price_changes SET (timescaledb.compress, timescaledb.compress_segmentby = 'asset_id',
+                               timescaledb.compress_orderby = 'time DESC');
+SELECT add_compression_policy('price_changes', INTERVAL '1 day');
+
 -- Trades with wallet, from the Data API. transaction_hash joins with ws_events (last_trade_price).
 CREATE TABLE trades (
     time             timestamptz      NOT NULL,
@@ -57,6 +89,8 @@ CREATE TABLE trades (
     size             double precision NOT NULL,
     price            double precision NOT NULL,
     outcome          text,
+    -- our clock at insert, to simulate when a strategy could have known the wallet; NULL for rows from before it existed.
+    recorded_at      timestamptz DEFAULT now(),
     -- shortcut: two identical fills (same wallet, token, side, size, price) in one tx collapse into one row.
     UNIQUE (transaction_hash, token_id, proxy_wallet, side, size, price, time)
 );
