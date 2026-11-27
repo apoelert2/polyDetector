@@ -89,6 +89,8 @@ CREATE TABLE trades (
     size             double precision NOT NULL,
     price            double precision NOT NULL,
     outcome          text,
+    -- our clock at insert, to simulate when a strategy could have known the wallet; NULL for rows from before it existed.
+    recorded_at      timestamptz DEFAULT now(),
     -- shortcut: two identical fills (same wallet, token, side, size, price) in one tx collapse into one row.
     UNIQUE (transaction_hash, token_id, proxy_wallet, side, size, price, time)
 );
