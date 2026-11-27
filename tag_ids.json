@@ -13,5 +13,16 @@
     {"id": 101737, "label": "Tariff"},
     {"id": 103070, "label": "Nobel Peace Prize"},
     {"id": 961, "label": "regulatory news"},
-    {"id": 104010, "label": "Iran Ceasefire"}
+    {"id": 104010, "label": "Iran Ceasefire"},
+    {"id": 100343, "label": "Mentions"},
+    {"id": 102851, "label": "spotify"},
+    {"id": 103080, "label": "album"},
+    {"id": 103077, "label": "billboard"},
+    {"id": 146, "label": "YouTube"},
+    {"id": 102823, "label": "Google Search"},
+    {"id": 929, "label": "Super Bowl"},
+    {"id": 103247, "label": "halftime"},
+    {"id": 1000, "label": "Oscars"},
+    {"id": 924, "label": "Grammys"},
+    {"id": 983, "label": "Emmys"}
 ]
