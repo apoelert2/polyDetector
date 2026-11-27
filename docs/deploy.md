@@ -1,7 +1,8 @@
 # Deploying to a VPS
 
 How a merge to `main` reaches the server, and the one-time setup. Written for a Hetzner Cloud server
-with Ubuntu 24.04, but any Linux VPS with Docker works.
+with Ubuntu 24.04 on an ARM server (CAX11). The CI builds `linux/arm64` images; for an x86 server
+change `runs-on` and `platforms` in the `images` job of `.github/workflows/ci.yml`.
 
 ```
 merge to main ─→ GitHub Actions: checks ─→ images to ghcr.io ─→ ssh deploy@server <sha>
