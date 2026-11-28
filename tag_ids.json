@@ -24,5 +24,18 @@
     {"id": 103247, "label": "halftime"},
     {"id": 1000, "label": "Oscars"},
     {"id": 924, "label": "Grammys"},
-    {"id": 983, "label": "Emmys"}
+    {"id": 983, "label": "Emmys"},
+    {"id": 105579, "label": "AI Releases"},
+    {"id": 1013, "label": "Earnings"},
+    {"id": 102451, "label": "Earnings Calls"},
+    {"id": 100478, "label": "fomc"},
+    {"id": 101701, "label": "CPI"},
+    {"id": 100453, "label": "resign"},
+    {"id": 600, "label": "IPOs"},
+    {"id": 102599, "label": "IPO"},
+    {"id": 101489, "label": "FDA"},
+    {"id": 552, "label": "mergers and acquisitions"},
+    {"id": 103106, "label": "M&A"},
+    {"id": 102691, "label": "Acquisitions"},
+    {"id": 100617, "label": "takeover"}
 ]
